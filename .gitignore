@@ -7,17 +7,7 @@ __pycache__/
 venv/
 .env
 
-# Data & outputs (keep directory placeholders via .gitkeep)
-data/instance/*
-!data/instance/.gitkeep
-
-outputs/*
-!outputs/.gitkeep
-
-# Large / generated artifacts
-*.safetensors
-*.ckpt
-*.pt
+# Experiment tracking (local only)
 wandb/
 
 # OS / IDE
@@ -25,9 +15,6 @@ wandb/
 .idea/
 .vscode/
 .cursor/
-
-# Local overrides (copy from example)
-configs/train_args.sh
 
 # Course handout (keep local only)
 aims5760_homework2_.pdf

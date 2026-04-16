@@ -63,7 +63,7 @@ Add **3–5** images of one subject to `data/instance/` (see [data/README.md](da
 
    Default `train_args` use **500 steps** and **learning rate `5e-5`** so a handful of instance photos is less likely to overfit (mushy limbs, blown-out eyes). If the subject is still underfit, raise steps slightly or try `7e-5`; if it still degrades, lower steps or LR.
 
-Logs default to TensorBoard under your `OUTPUT_DIR`. LoRA weights are written to `OUTPUT_DIR` (e.g. `pytorch_lora_weights.safetensors`).
+Logs default to TensorBoard under your `OUTPUT_DIR`. LoRA weights and checkpoints live under `OUTPUT_DIR` (e.g. `pytorch_lora_weights.safetensors`, `checkpoint-*`). This repo may include `outputs/` and `configs/train_args.sh` in Git for reproducibility—use `--lora_path` pointing at your run folder (e.g. `outputs/lora-run1`).
 
 **Reproducibility:** record in your report: base model id, identifier prompt, seed, `MAX_TRAIN_STEPS`, batch settings, and `NUM_PROCESSES`.
 
