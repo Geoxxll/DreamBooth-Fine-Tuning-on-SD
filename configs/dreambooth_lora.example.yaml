@@ -18,8 +18,8 @@ training:
   resolution: 512
   train_batch_size: 1          # per GPU
   gradient_accumulation_steps: 1
-  max_train_steps: 800         # tune for your dataset; small data → risk of overfit
-  learning_rate: 0.0001
+  max_train_steps: 500         # small instance sets: prefer fewer steps + lower LR vs 800/1e-4
+  learning_rate: 0.00005
   lr_scheduler: "constant"
   lr_warmup_steps: 0
   mixed_precision: "fp16"
@@ -32,8 +32,8 @@ lora:
 validation:
   validation_prompt: "a photo of sks dog in a snowy mountain"
   num_validation_images: 4
-  validation_epochs: 50
+  validation_epochs: 5
 
 multi_gpu:
   # Effective batch = train_batch_size * num_gpus * gradient_accumulation_steps
-  num_processes: 2
+  num_processes: 1

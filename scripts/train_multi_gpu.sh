@@ -12,7 +12,7 @@ fi
 # shellcheck source=/dev/null
 source "$TRAIN_ARGS_FILE"
 
-NUM_PROCESSES="${NUM_PROCESSES:-2}"
+NUM_PROCESSES="${NUM_PROCESSES:-1}"
 
 PRIOR_FLAGS=()
 if [[ "${WITH_PRIOR_PRESERVATION:-false}" == "true" ]]; then
@@ -28,7 +28,6 @@ if [[ -n "${CLASS_PROMPT:-}" ]]; then
 fi
 
 exec accelerate launch \
-  --multi_gpu \
   --num_processes "$NUM_PROCESSES" \
   "$REPO_ROOT/scripts/train_dreambooth_lora.py" \
   --pretrained_model_name_or_path "$PRETRAINED_MODEL_NAME_OR_PATH" \

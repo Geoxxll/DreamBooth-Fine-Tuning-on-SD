@@ -38,6 +38,13 @@ from peft import LoraConfig
 from peft.utils import get_peft_model_state_dict, set_peft_model_state_dict
 from PIL import Image
 from PIL.ImageOps import exif_transpose
+
+try:
+    from pillow_heif import register_heif_opener
+
+    register_heif_opener()
+except ImportError:
+    pass
 from torch.utils.data import Dataset
 from torchvision import transforms
 from tqdm.auto import tqdm
@@ -548,6 +555,18 @@ def parse_args(input_args=None):
     return args
 
 
+_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff", ".heic", ".heif"}
+
+
+def _list_image_files(root: Path):
+    """Only regular files with known image suffixes (skips .gitkeep, dirs, etc.)."""
+    paths = []
+    for p in sorted(root.iterdir()):
+        if p.is_file() and p.suffix.lower() in _IMAGE_EXTENSIONS:
+            paths.append(p)
+    return paths
+
+
 class DreamBoothDataset(Dataset):
     """
     A dataset to prepare the instance and class images with the prompts for fine-tuning the model.
@@ -579,19 +598,29 @@ class DreamBoothDataset(Dataset):
         if not self.instance_data_root.exists():
             raise ValueError("Instance images root doesn't exists.")
 
-        self.instance_images_path = list(Path(instance_data_root).iterdir())
+        self.instance_images_path = _list_image_files(Path(instance_data_root))
         self.num_instance_images = len(self.instance_images_path)
+        if self.num_instance_images == 0:
+            raise ValueError(
+                f"No image files found under {instance_data_root}. "
+                f"Add .png/.jpg/… images; dotfiles like .gitkeep are ignored."
+            )
         self.instance_prompt = instance_prompt
         self._length = self.num_instance_images
 
         if class_data_root is not None:
             self.class_data_root = Path(class_data_root)
             self.class_data_root.mkdir(parents=True, exist_ok=True)
-            self.class_images_path = list(self.class_data_root.iterdir())
+            self.class_images_path = _list_image_files(self.class_data_root)
             if class_num is not None:
                 self.num_class_images = min(len(self.class_images_path), class_num)
             else:
                 self.num_class_images = len(self.class_images_path)
+            if self.num_class_images == 0:
+                raise ValueError(
+                    f"No class image files found under {class_data_root}. "
+                    f"Add regularization images or generate them for prior preservation."
+                )
             self._length = max(self.num_class_images, self.num_instance_images)
             self.class_prompt = class_prompt
         else:
@@ -1363,6 +1392,14 @@ def main(args):
                     epoch,
                     torch_dtype=weight_dtype,
                 )
+                # `DiffusionPipeline.from_pretrained(..., torch_dtype=weight_dtype)` casts trainable LoRA
+                # weights to fp16; GradScaler then errors on clip_grad_norm ("Attempting to unscale FP16
+                # gradients"). Restore fp32 trainable params — same as after `add_adapter` above.
+                if args.mixed_precision == "fp16":
+                    _restore = [unwrap_model(unet)]
+                    if args.train_text_encoder and text_encoder is not None:
+                        _restore.append(unwrap_model(text_encoder))
+                    cast_training_params(_restore, dtype=torch.float32)
 
     # Save the lora layers
     accelerator.wait_for_everyone()

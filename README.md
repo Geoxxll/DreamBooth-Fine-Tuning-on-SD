@@ -1,6 +1,6 @@
 # DreamBooth LoRA (SD 1.5) — course project layout
 
-This repo follows a **Hugging Face diffusers + accelerate** workflow: **data → LoRA fine-tuning → generation → report**. It is sized for **2× 12GB-class GPUs** (e.g. RTX 4070) using **LoRA**, not full-model DreamBooth.
+This repo follows a **Hugging Face diffusers + accelerate** workflow: **data → LoRA fine-tuning → generation → report**. Defaults assume **one 12GB-class GPU** (e.g. RTX 5070) using **LoRA**, not full-model DreamBooth; you can raise `NUM_PROCESSES` for multi-GPU.
 
 ## Layout
 
@@ -10,7 +10,7 @@ This repo follows a **Hugging Face diffusers + accelerate** workflow: **data →
 | `configs/train_args.example.sh` | Copy to `configs/train_args.sh` and edit prompts/paths |
 | `configs/dreambooth_lora.example.yaml` | Human-readable hyperparameter reference |
 | `scripts/train_dreambooth_lora.py` | Vendored from diffusers `v0.31.0` (see `scripts/VENDORED.md`) |
-| `scripts/train_multi_gpu.sh` | `accelerate launch` wrapper for two GPUs |
+| `scripts/train_multi_gpu.sh` | `accelerate launch` wrapper (single- or multi-GPU via `NUM_PROCESSES`) |
 | `scripts/generate.py` | Load LoRA and save PNGs to `samples/` |
 | `outputs/` | Checkpoints & LoRA weights (**contents gitignored**) |
 | `samples/` | Curated outputs for your PDF report |
@@ -43,7 +43,7 @@ This repo follows a **Hugging Face diffusers + accelerate** workflow: **data →
 
 Add **3–5** images of one subject to `data/instance/` (see [data/README.md](data/README.md)).
 
-## Training (2 GPUs)
+## Training
 
 1. Copy and edit training variables:
 
@@ -52,14 +52,16 @@ Add **3–5** images of one subject to `data/instance/` (see [data/README.md](da
    # edit INSTANCE_PROMPT / OUTPUT_DIR / steps / learning rate, etc.
    ```
 
-2. Launch (defaults to **2** processes; `configs/train_args.example.sh` sets `NUM_PROCESSES=2` for **2× RTX 4070**. Override with `NUM_PROCESSES=1` for one GPU):
+2. Launch (`configs/train_args.example.sh` sets `NUM_PROCESSES=1` for **one GPU**; set `NUM_PROCESSES=2` and re-run `accelerate config` if you use two cards):
 
    ```bash
    chmod +x scripts/train_multi_gpu.sh
    ./scripts/train_multi_gpu.sh
    ```
 
-   **2× 4070 (12GB) checklist:** `accelerate config` → multi-GPU, 2 processes; training uses `fp16`, `gradient_checkpointing`, `--allow_tf32`, `TRAIN_BATCH_SIZE=1` per device — typical for SD1.5 LoRA on this hardware.
+   **RTX 5070 (12GB) checklist:** `accelerate config` → single GPU (or multi-GPU with matching process count); training uses `fp16`, `gradient_checkpointing`, `--allow_tf32`, `TRAIN_BATCH_SIZE=1` per device — typical for SD1.5 LoRA on this hardware.
+
+   Default `train_args` use **500 steps** and **learning rate `5e-5`** so a handful of instance photos is less likely to overfit (mushy limbs, blown-out eyes). If the subject is still underfit, raise steps slightly or try `7e-5`; if it still degrades, lower steps or LR.
 
 Logs default to TensorBoard under your `OUTPUT_DIR`. LoRA weights are written to `OUTPUT_DIR` (e.g. `pytorch_lora_weights.safetensors`).
 

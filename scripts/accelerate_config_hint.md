@@ -1,4 +1,4 @@
-# Accelerate (multi-GPU) setup
+# Accelerate setup
 
 Run once per machine (interactive or non-interactive):
 
@@ -6,15 +6,15 @@ Run once per machine (interactive or non-interactive):
 accelerate config
 ```
 
-Suggested answers for **2× GPU (e.g. RTX 4070)** training:
+Suggested answers for **1× GPU (e.g. RTX 5070, 12GB)** — matches the repo default `NUM_PROCESSES=1`:
 
 - Compute environment: **This machine**
-- Distributed: **multi-GPU**
-- Number of machines: **1**
-- Number of processes: **2** (or match visible GPUs)
-- GPU ids: **all** (default)
+- Distributed: **no** (single GPU)
 - Mixed precision: **fp16** (or bf16 if supported and preferred)
 - Dynamo: **no** (unless you know you want it)
+
+For **2× GPU** (e.g. two 12GB cards), use **multi-GPU**, **1** machine, **2** processes (or match visible GPUs), **fp16**, same as above.
+
 
 To generate a default config without prompts (then edit `~/.cache/huggingface/accelerate/default_config.yaml` if needed):
 
@@ -22,4 +22,4 @@ To generate a default config without prompts (then edit `~/.cache/huggingface/ac
 accelerate config default
 ```
 
-Training uses `accelerate launch` from `scripts/train_multi_gpu.sh`, which passes `--multi_gpu` and `--num_processes` explicitly; your saved config should still be consistent (especially mixed precision).
+Training uses `accelerate launch` from `scripts/train_multi_gpu.sh` with `--num_processes` set from `NUM_PROCESSES`; your saved Accelerate config should still be consistent (especially mixed precision).
