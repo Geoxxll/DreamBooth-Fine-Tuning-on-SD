@@ -1,0 +1,4 @@
+# One prompt per line (for scripts/generate.py --prompts_file)
+a photo of sks dog
+a photo of sks dog wearing sunglasses, beach
+a photo of sks dog, oil painting style

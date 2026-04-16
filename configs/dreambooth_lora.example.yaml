@@ -1,0 +1,39 @@
+# Reference hyperparameters (human-readable). The training entrypoint uses CLI flags;
+# edit `configs/train_args.sh` (copy from train_args.example.sh) for actual runs.
+#
+# Identifier: pick a rare token (e.g. sks) + class (e.g. dog) → prompt "a photo of sks dog"
+
+subject:
+  instance_prompt: "a photo of sks dog"   # must match training
+  class_prompt: "a photo of a dog"        # optional; used with prior preservation
+
+model:
+  pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
+
+paths:
+  instance_data_dir: "data/instance"
+  output_dir: "outputs/lora-run1"
+
+training:
+  resolution: 512
+  train_batch_size: 1          # per GPU
+  gradient_accumulation_steps: 1
+  max_train_steps: 800         # tune for your dataset; small data → risk of overfit
+  learning_rate: 0.0001
+  lr_scheduler: "constant"
+  lr_warmup_steps: 0
+  mixed_precision: "fp16"
+  gradient_checkpointing: true
+  seed: 42
+
+lora:
+  rank: 4
+
+validation:
+  validation_prompt: "a photo of sks dog in a snowy mountain"
+  num_validation_images: 4
+  validation_epochs: 50
+
+multi_gpu:
+  # Effective batch = train_batch_size * num_gpus * gradient_accumulation_steps
+  num_processes: 2
