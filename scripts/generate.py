@@ -50,8 +50,8 @@ def parse_args() -> argparse.Namespace:
         help="Comma-separated seeds; one image per (prompt, seed) pair.",
     )
     # Slightly softer defaults than 30 / 7.5 — finetuned LoRAs often look cleaner at ~7.0 CFG.
-    p.add_argument("--num_inference_steps", type=int, default=35)
-    p.add_argument("--guidance_scale", type=float, default=7.5)
+    p.add_argument("--num_inference_steps", type=int, default=40)
+    p.add_argument("--guidance_scale", type=float, default=6)
     p.add_argument("--height", type=int, default=512)
     p.add_argument("--width", type=int, default=512)
     p.add_argument(

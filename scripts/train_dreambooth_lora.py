@@ -47,6 +47,7 @@ except ImportError:
     pass
 from torch.utils.data import Dataset
 from torchvision import transforms
+from torchvision.utils import save_image
 from tqdm.auto import tqdm
 from transformers import AutoTokenizer, PretrainedConfig
 
@@ -131,6 +132,7 @@ def log_validation(
     epoch,
     torch_dtype,
     is_final_validation=False,
+    global_step=None,
 ):
     logger.info(
         f"Running validation... \n Generating {args.num_validation_images} images with prompt:"
@@ -169,11 +171,35 @@ def log_validation(
                 image = pipeline(**pipeline_args, image=image, generator=generator).images[0]
             images.append(image)
 
+    # TensorBoard: float tensor (N, C, H, W) in [0, 1]; same step as scalars. Also save PNGs for hosts where TB UI
+    # points at the wrong logdir (e.g. Vast.ai) — see `output_dir/validation_vis/`.
+    tb_step = global_step if global_step is not None else epoch
+    phase_name = "test" if is_final_validation else "validation"
+    if len(images) == 0:
+        del pipeline
+        torch.cuda.empty_cache()
+        return images
+
+    tensors = []
+    for img in images:
+        arr = np.asarray(img.convert("RGB"), dtype=np.float32) / 255.0
+        tensors.append(torch.from_numpy(arr).permute(2, 0, 1))
+    batch = torch.stack(tensors)
+
+    tb_tr = accelerator.get_tracker("tensorboard", unwrap=False)
+    if getattr(tb_tr, "writer", None) is not None:
+        try:
+            tb_tr.log_images({f"{phase_name}/samples": batch}, step=tb_step)
+            tb_tr.writer.flush()
+        except Exception as e:
+            logger.warning(f"TensorBoard log_images failed ({e}); validation PNGs still saved to disk.")
+    vis_dir = Path(args.output_dir) / "validation_vis"
+    vis_dir.mkdir(parents=True, exist_ok=True)
+    png_path = vis_dir / f"{phase_name}_step_{tb_step:06d}.png"
+    save_image(batch, png_path, nrow=min(4, batch.shape[0]))
+    logger.info(f"Saved validation grid to {png_path.resolve()}")
+
     for tracker in accelerator.trackers:
-        phase_name = "test" if is_final_validation else "validation"
-        if tracker.name == "tensorboard":
-            np_images = np.stack([np.asarray(img) for img in images])
-            tracker.writer.add_images(phase_name, np_images, epoch, dataformats="NHWC")
         if tracker.name == "wandb":
             tracker.log(
                 {
@@ -1183,6 +1209,13 @@ def main(args):
         tracker_config = vars(copy.deepcopy(args))
         tracker_config.pop("validation_images")
         accelerator.init_trackers("dreambooth-lora", config=tracker_config)
+        # Scalars + images land under logging_dir / project_name (see accelerate TensorBoardTracker).
+        _tb_events = Path(args.output_dir, args.logging_dir, "dreambooth-lora").resolve()
+        logger.info(
+            f"TensorBoard event dir: {_tb_events} — set Vast.ai / `tensorboard --logdir` to "
+            f"{Path(args.output_dir, args.logging_dir).resolve()} (parent) or this folder. "
+            f"Validation previews are also saved under {Path(args.output_dir, 'validation_vis').resolve()}."
+        )
 
     # Train!
     total_batch_size = args.train_batch_size * accelerator.num_processes * args.gradient_accumulation_steps
@@ -1366,7 +1399,7 @@ def main(args):
 
         if accelerator.is_main_process:
             if args.validation_prompt is not None and epoch % args.validation_epochs == 0:
-                # create pipeline
+                # Validation images → TensorBoard in `log_validation` (tags `validation/samples` or `test/samples`).
                 pipeline = DiffusionPipeline.from_pretrained(
                     args.pretrained_model_name_or_path,
                     unet=unwrap_model(unet),
@@ -1391,6 +1424,7 @@ def main(args):
                     pipeline_args,
                     epoch,
                     torch_dtype=weight_dtype,
+                    global_step=global_step,
                 )
                 # `DiffusionPipeline.from_pretrained(..., torch_dtype=weight_dtype)` casts trainable LoRA
                 # weights to fp16; GradScaler then errors on clip_grad_norm ("Attempting to unscale FP16
@@ -1440,8 +1474,9 @@ def main(args):
                 accelerator,
                 pipeline_args,
                 epoch,
-                is_final_validation=True,
                 torch_dtype=weight_dtype,
+                is_final_validation=True,
+                global_step=global_step,
             )
 
         if args.push_to_hub:
